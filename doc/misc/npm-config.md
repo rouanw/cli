@@ -359,6 +359,22 @@ If set to true, then npm will stubbornly refuse to install (or even
 consider installing) any package that claims to not be compatible with
 the current Node.js version.
 
+### enjoy-by
+
+* Alias: before
+* Default: null
+* Type: Date
+
+If passed to `npm install`, will rebuild the npm tree such that only versions
+that were available **on or before** the `enjoy-by` time get installed.
+If there's no versions available for the current set of direct dependencies, the
+command will error.
+
+If the requested version is a `dist-tag` and the given tag does not pass the
+`enjoy-by` filter, the most recent version less than or equal to that tag will
+be used. For example, `foo@latest` might install `foo@1.2` even though `latest`
+is `2.0`.
+
 ### force
 
 * Default: false
