@@ -263,6 +263,70 @@ test('exits with non-zero exit code for vulnerabilities at the `audit-level` fla
   })
 })
 
+test('exits with non-zero exit code and prints a useful error message when the response from the registry is malformed', t => {
+  const fixture = new Tacks(new Dir({
+    'package.json': new File({
+      name: 'foo',
+      version: '1.0.0',
+      dependencies: {
+        baddep: '1.0.0'
+      }
+    })
+  }))
+  fixture.create(testDir)
+  return tmock(t).then(srv => {
+    srv.filteringRequestBody(req => 'ok')
+    srv.post('/-/npm/v1/security/audits/quick', 'ok').reply(200, 'yeah')
+    srv.get('/baddep').twice().reply(200, {
+      name: 'baddep',
+      'dist-tags': {
+        'latest': '1.2.3'
+      },
+      versions: {
+        '1.0.0': {
+          name: 'baddep',
+          version: '1.0.0',
+          _hasShrinkwrap: false,
+          dist: {
+            shasum: 'deadbeef',
+            tarball: common.registry + '/idk/-/idk-1.0.0.tgz'
+          }
+        },
+        '1.2.3': {
+          name: 'baddep',
+          version: '1.2.3',
+          _hasShrinkwrap: false,
+          dist: {
+            shasum: 'deadbeef',
+            tarball: common.registry + '/idk/-/idk-1.2.3.tgz'
+          }
+        }
+      }
+    })
+    return common.npm([
+      'install',
+      '--audit',
+      '--json',
+      '--package-lock-only',
+      '--registry', common.registry,
+      '--cache', path.join(testDir, 'npm-cache')
+    ], EXEC_OPTS).then(([code, stdout, stderr]) => {
+      srv.filteringRequestBody(req => 'ok')
+      srv.post('/-/npm/v1/security/audits', 'ok').reply(200, {})
+      return common.npm([
+        'audit',
+        '--json',
+        '--registry', common.registry,
+        '--cache', path.join(testDir, 'npm-cache')
+      ], EXEC_OPTS).then(([code, stdout, stderr]) => {
+        t.notMatch(stderr, /.*Cannot read property 'vulnerabilities' of undefined.*/)
+        t.match(stderr, /.*Unable to parse audit response from registry/)
+        t.equal(code, 1, 'exited OK')
+      })
+    })
+  })
+})
+
 test('cleanup', t => {
   return rimraf(testDir)
 })
